@@ -1,33 +1,31 @@
 "use client"
 
 import { useState } from "react"
-import { useEffect } from 'react'
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card"
-import { authenticate } from "./auth"
-import Link from "next/link"
-import { useUser } from "./UserContext"
-import { usePaperContext } from "./PaperContext"
+import { signup } from "../auth"
 
-export default function LoginPage() {
+export default function SignupPage() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const router = useRouter()
-  const { setUser } = useUser()
-  const { loadUserData } = usePaperContext()
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
-    const authenticatedUser = authenticate(username, password)
-    if (authenticatedUser) {
-      setUser(authenticatedUser)
-      loadUserData(authenticatedUser.id)
-      router.push("/main")
+    if (password !== confirmPassword) {
+      alert("Passwords do not match")
+      return
+    }
+    if (await signup(username, password)) {
+      alert("Signup successful! Please log in.")
+      router.push("/")
     } else {
-      alert("Invalid username or password")
+      alert("Signup failed. Username may already exist.")
     }
   }
 
@@ -35,10 +33,10 @@ export default function LoginPage() {
     <div className="flex items-center justify-center min-h-screen">
       <Card className="w-[350px]">
         <CardHeader>
-          <CardTitle>Login</CardTitle>
+          <CardTitle>Sign Up</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleSignup} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="username">Username</Label>
               <Input
@@ -59,14 +57,24 @@ export default function LoginPage() {
                 required
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+            </div>
             <Button type="submit" className="w-full">
-              Login
+              Sign Up
             </Button>
           </form>
         </CardContent>
         <CardFooter className="flex justify-center">
-          <Link href="/signup" className="text-sm text-blue-600 hover:underline">
-            Don't have an account? Sign up
+          <Link href="/" className="text-sm text-blue-600 hover:underline">
+            Already have an account? Log in
           </Link>
         </CardFooter>
       </Card>

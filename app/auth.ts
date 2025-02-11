@@ -9,7 +9,8 @@ const users: { [key: string]: User } = {
 
 // This is a mock authentication function
 // In a real application, this would typically involve checking against a database or calling an API
-export function authenticate(username: string, password: string): User | null {
+export const authenticate = async (username: string, _password: string) => {
+  // 언더스코어를 붙이면 "의도적으로 사용하지 않는 매개변수"라는 의미
   const user = Object.values(users).find((u) => u.username === username)
   if (user && users[user.id].username === username) {
     return user

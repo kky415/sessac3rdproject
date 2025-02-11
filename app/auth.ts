@@ -28,6 +28,14 @@ export const register = async (username: string, password: string) => {
   return false
 }
 
+export const resetPassword = async (username: string, password: string) => {
+  // 비밀번호 재설정 로직 구현
+  if (username && password.length >= 6) {
+    return true
+  }
+  return false
+}
+
 export async function signup(username: string, password: string): Promise<User | null> {
   if (Object.values(users).some((u) => u.username === username)) {
     return null // Username already exists

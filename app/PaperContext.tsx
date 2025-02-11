@@ -25,7 +25,7 @@ interface PaperContextType {
   getPersonalNote: (userId: string, paperId: number) => string | null
   searchPapersByConcept: (userId: string, conceptName: string) => Paper[]
   getUserVoteForNote: (userId: string, noteId: number) => "upvote" | "downvote" | null
-  loadUserData: (userId: string) => void
+  loadUserData: (userId: number) => void
   addNote: (userId: string, paperId: number, noteContent: string) => void
   editNote: (userId: string, paperId: number, noteId: number, newContent: string) => void
 }
@@ -82,7 +82,7 @@ export function PaperProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("personalNotes", JSON.stringify(personalNotes))
   }, [personalNotes])
 
-  const loadUserData = (userId: string) => {
+  const loadUserData = (userId: number) => {
     if (!userPapers[userId]) {
       setUserPapers((prev) => ({ ...prev, [userId]: [...papers] }))
     }

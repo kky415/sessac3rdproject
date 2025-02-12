@@ -1,3 +1,6 @@
 {
-  "extends": ["next/core-web-vitals", "next/typescript"]
+  "extends": ["next/core-web-vitals", "next/typescript"],
+  "rules": {
+    "@typescript-eslint/no-unused-vars": "off" // "off" 또는 "warn"으로 변경 가능
+  }
 }

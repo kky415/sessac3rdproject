@@ -3,101 +3,15 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { ChevronDown, ChevronUp, X, Bookmark } from "lucide-react"
+import type { Paper, Note } from "@/lib/sample-data"
 
-interface Paper {
-  id: number
-  title: string
-  author: string
-  year: number
-  category: string
-  abstract: string
-  doi: string
-  journal: string
-  citations: number
-  keywords: string[]
+// 코사인 유사도 계산 함수
+function cosineSimilarity(vecA: number[], vecB: number[]): number {
+  const dotProduct = vecA.reduce((acc, val, i) => acc + val * vecB[i], 0)
+  const magnitudeA = Math.sqrt(vecA.reduce((acc, val) => acc + val * val, 0))
+  const magnitudeB = Math.sqrt(vecB.reduce((acc, val) => acc + val * val, 0))
+  return dotProduct / (magnitudeA * magnitudeB)
 }
-
-interface Note {
-  userId: number
-  paperId: number
-  noteContent: string
-}
-
-// Sample data for testing
-const samplePapers: Paper[] = [
-  {
-    id: 1,
-    title: "Machine Learning Algorithms",
-    author: "John Doe",
-    year: 2021,
-    category: "AI",
-    abstract: "This paper explores various machine learning algorithms and their applications in real-world scenarios.",
-    doi: "10.1234/ml.2021.01",
-    journal: "Journal of Artificial Intelligence",
-    citations: 45,
-    keywords: ["machine learning", "algorithms", "AI applications"],
-  },
-  {
-    id: 2,
-    title: "Quantum Computing Basics",
-    author: "Jane Smith",
-    year: 2020,
-    category: "Quantum Physics",
-    abstract:
-      "An introduction to the fundamental concepts of quantum computing and its potential impact on computational power.",
-    doi: "10.5678/qc.2020.02",
-    journal: "Quantum Computing Review",
-    citations: 32,
-    keywords: ["quantum computing", "quantum physics", "computational power"],
-  },
-  {
-    id: 3,
-    title: "Climate Change Effects",
-    author: "Bob Johnson",
-    year: 2022,
-    category: "Environmental Science",
-    abstract: "A comprehensive study on the current and projected effects of climate change on global ecosystems.",
-    doi: "10.9101/cc.2022.03",
-    journal: "Environmental Science Journal",
-    citations: 28,
-    keywords: ["climate change", "global warming", "ecosystems"],
-  },
-  {
-    id: 4,
-    title: "Neural Networks in Practice",
-    author: "Alice Brown",
-    year: 2021,
-    category: "AI",
-    abstract:
-      "This paper discusses practical implementations of neural networks in various industries and their performance.",
-    doi: "10.1122/nn.2021.04",
-    journal: "Applied AI Journal",
-    citations: 37,
-    keywords: ["neural networks", "deep learning", "AI applications"],
-  },
-  {
-    id: 5,
-    title: "Sustainable Energy Solutions",
-    author: "Charlie Green",
-    year: 2023,
-    category: "Environmental Science",
-    abstract:
-      "An overview of emerging sustainable energy technologies and their potential to address global energy challenges.",
-    doi: "10.3344/se.2023.05",
-    journal: "Renewable Energy Studies",
-    citations: 15,
-    keywords: ["sustainable energy", "renewable energy", "green technology"],
-  },
-]
-
-// Sample notes data
-const sampleNotes: Note[] = [
-  {
-    userId: 1,
-    paperId: 1,
-    noteContent: "Interesting overview of ML algorithms. Follow up on section 3.2 about neural networks.",
-  },
-]
 
 export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -109,43 +23,52 @@ export default function Dashboard() {
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null)
   const [bookmarkedPapers, setBookmarkedPapers] = useState<number[]>([])
   const [recentlyReadPapers, setRecentlyReadPapers] = useState<Paper[]>([])
-  const [papers, setPapers] = useState<Paper[]>(samplePapers)
-  const [notes, setNotes] = useState<Note[]>(sampleNotes)
+  const [papers, setPapers] = useState<Paper[]>([])
+  const [notes, setNotes] = useState<Note[]>([])
   const [currentNote, setCurrentNote] = useState("")
+  const [recommendedPapers, setRecommendedPapers] = useState<Paper[]>([])
 
   // Assume we have a logged-in user with ID 1
   const currentUserId = 1
 
   useEffect(() => {
+    fetchPapers()
+  }, [])
+
+  useEffect(() => {
     setRecentlyReadPapers(papers.slice(0, 3))
   }, [papers])
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    const results = papers.filter((paper) => {
-      const matchesKeyword =
-        paper.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        paper.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        paper.keywords.some((keyword) => keyword.toLowerCase().includes(searchQuery.toLowerCase()))
-      const matchesAuthor = author ? paper.author.toLowerCase().includes(author.toLowerCase()) : true
-      const matchesYear = year ? paper.year.toString() === year : true
-      const matchesCategory = category ? paper.category.toLowerCase().includes(category.toLowerCase()) : true
+  const fetchPapers = async () => {
+    const response = await fetch("/api/papers")
+    const data = await response.json()
+    setPapers(data)
+  }
 
-      return matchesKeyword && matchesAuthor && matchesYear && matchesCategory
-    })
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const queryParams = new URLSearchParams({
+      query: searchQuery,
+      author,
+      year,
+      category,
+    }).toString()
+    const response = await fetch(`/api/papers?${queryParams}`)
+    const results = await response.json()
     setSearchResults(results)
   }
 
   const openPaperDetails = (paper: Paper) => {
     setSelectedPaper(paper)
     updateRecentlyRead(paper)
-    const existingNote = notes.find((note) => note.userId === currentUserId && note.paperId === paper.id)
-    setCurrentNote(existingNote ? existingNote.noteContent : "")
+    fetchNote(paper.id)
+    findSimilarPapers(paper)
   }
 
   const closePaperDetails = () => {
     setSelectedPaper(null)
     setCurrentNote("")
+    setRecommendedPapers([])
   }
 
   const updateRecentlyRead = (paper: Paper) => {
@@ -161,23 +84,57 @@ export default function Dashboard() {
     )
   }
 
-  const saveNote = () => {
+  const saveNote = async () => {
     if (selectedPaper) {
-      setNotes((prevNotes) => {
-        const existingNoteIndex = prevNotes.findIndex(
-          (note) => note.userId === currentUserId && note.paperId === selectedPaper.id,
-        )
-        if (existingNoteIndex !== -1) {
-          // Update existing note
-          const updatedNotes = [...prevNotes]
-          updatedNotes[existingNoteIndex] = { ...updatedNotes[existingNoteIndex], noteContent: currentNote }
-          return updatedNotes
-        } else {
-          // Add new note
-          return [...prevNotes, { userId: currentUserId, paperId: selectedPaper.id, noteContent: currentNote }]
-        }
-      })
+      const noteData = {
+        userId: currentUserId,
+        paperId: selectedPaper.id,
+        noteContent: currentNote,
+      }
+
+      const existingNote = notes.find((note) => note.userId === currentUserId && note.paperId === selectedPaper.id)
+
+      if (existingNote) {
+        const response = await fetch("/api/notes", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...noteData, id: existingNote.id }),
+        })
+        const updatedNote = await response.json()
+        setNotes((prevNotes) => prevNotes.map((note) => (note.id === updatedNote.id ? updatedNote : note)))
+      } else {
+        const response = await fetch("/api/notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(noteData),
+        })
+        const newNote = await response.json()
+        setNotes((prevNotes) => [...prevNotes, newNote])
+      }
     }
+  }
+
+  const fetchNote = async (paperId: number) => {
+    const response = await fetch(`/api/notes?userId=${currentUserId}&paperId=${paperId}`)
+    const data = await response.json()
+    if (data) {
+      setCurrentNote(data.noteContent)
+    } else {
+      setCurrentNote("")
+    }
+  }
+
+  const findSimilarPapers = (paper: Paper) => {
+    const similarities = papers
+      .filter((p) => p.id !== paper.id)
+      .map((p) => ({
+        paper: p,
+        similarity: cosineSimilarity(paper.paper_vector, p.paper_vector),
+      }))
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, 5)
+
+    setRecommendedPapers(similarities.map((s) => s.paper))
   }
 
   return (
@@ -349,6 +306,16 @@ export default function Dashboard() {
               >
                 Save Note
               </button>
+            </div>
+            <div className="mt-6">
+              <h3 className="text-xl font-bold mb-2">Recommended Papers</h3>
+              <ul className="space-y-2">
+                {recommendedPapers.map((paper) => (
+                  <li key={paper.id} className="cursor-pointer hover:underline" onClick={() => openPaperDetails(paper)}>
+                    {paper.title} - {paper.author}
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </div>
